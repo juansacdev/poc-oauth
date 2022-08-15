@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:13
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - dev
+
+  mongo:
+    image: mongo
+    container_name: mongodb
+    restart: always
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - dev
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 5s
+      retries: 3
+      interval: '10s'
+    networks:
+      - dev
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis_commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - 8081:8081
+    depends_on:
+      - redis
+    networks:
+      - dev
+
+  node_app:
+    container_name: node_app
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    command: ["npm", "run", "dev"]
+    depends_on:
+      - db
+    env_file:
+      - .env
+    ports:
+      - ${PORT}:${PORT}
+    volumes:
+      - .:/usr/app
+      - /usr/app/node_modules
+    networks:
+      - dev
+
+volumes:
+  postgres_data:
+    driver: local
+  mongo_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  dev:
+    driver: bridge
